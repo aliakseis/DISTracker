@@ -1,21 +1,109 @@
-// FarnebackTracker.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+// OPTICAL FLOW USING FARNEBACK ALGORITHM
 
 #include "pch.h"
+
+#include "opencv2/video/tracking.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
+#include "opencv2/highgui/highgui.hpp"
+
 #include <iostream>
 
-int main()
+using namespace cv;
+using namespace std;
+
+// Function to compute the optical flow map
+void drawOpticalFlow(const Mat& flowImage, Mat& flowImageGray)
 {
-    std::cout << "Hello World!\n"; 
+    int stepSize = 16;
+    Scalar color = Scalar(0, 255, 0);
+    
+    // Draw the uniform grid of points on the input image along with the motion vectors
+    for(int y = 0; y < flowImageGray.rows; y += stepSize)
+    {
+        for(int x = 0; x < flowImageGray.cols; x += stepSize)
+        {
+            // Circles to indicate the uniform grid of points
+            int radius = 2;
+            int thickness = -1;
+            circle(flowImageGray, Point(x,y), radius, color, thickness);
+            
+            // Lines to indicate the motion vectors
+            Point2f pt = flowImage.at<Point2f>(y, x);
+            line(flowImageGray, Point(x,y), Point(cvRound(x+pt.x), cvRound(y+pt.y)), color);
+        }
+    }
 }
 
-// Run program: Ctrl + F5 or Debug > Start Without Debugging menu
-// Debug program: F5 or Debug > Start Debugging menu
+int main(int argc, char** argv)
+{
+    // set default values for tracking algorithm and video
+    string videoPath = (argc == 2) ? argv[1] : "videos/run.mp4";
 
-// Tips for Getting Started: 
-//   1. Use the Solution Explorer window to add/manage files
-//   2. Use the Team Explorer window to connect to source control
-//   3. Use the Output window to see build output and other messages
-//   4. Use the Error List window to view errors
-//   5. Go to Project > Add New Item to create new code files, or Project > Add Existing Item to add existing code files to the project
-//   6. In the future, to open this project again, go to File > Open > Project and select the .sln file
+
+    // create a video capture object to read videos
+    cv::VideoCapture cap(videoPath);
+
+    if(!cap.isOpened())
+    {
+        cerr << "Unable to open the file. Exiting!" << endl;
+        return -1;
+    }
+    
+    char ch;
+    Mat curGray, prevGray, flowImage, flowImageGray, frame;
+    string windowName = "Optical Flow";
+    namedWindow(windowName, 1);
+    float scalingFactor = 0.75;
+    
+    // Iterate until the user presses the Esc key
+    while(true)
+    {
+        // Capture the current frame
+        cap >> frame;
+        
+        if(frame.empty())
+            break;
+        
+        // Resize the frame
+        resize(frame, frame, Size(), scalingFactor, scalingFactor, INTER_AREA);
+        
+        // Convert to grayscale
+        cvtColor(frame, curGray, COLOR_BGR2GRAY);
+        
+        // Check if the image is valid
+        if(prevGray.data)
+        {
+            // Initialize parameters for the optical flow algorithm
+            float pyrScale = 0.5;
+            int numLevels = 3;
+            int windowSize = 15;
+            int numIterations = 3;
+            int neighborhoodSize = 5;
+            float stdDeviation = 1.2;
+            
+            // Calculate optical flow map using Farneback algorithm
+            calcOpticalFlowFarneback(prevGray, curGray, flowImage, pyrScale, numLevels, windowSize, numIterations, neighborhoodSize, stdDeviation, OPTFLOW_USE_INITIAL_FLOW);
+            
+            // Convert to 3-channel RGB
+            cvtColor(prevGray, flowImageGray, COLOR_GRAY2BGR);
+            
+            // Draw the optical flow map
+            drawOpticalFlow(flowImage, flowImageGray);
+            
+            // Display the output image
+            imshow(windowName, flowImageGray);
+        }
+        
+        // Break out of the loop if the user presses the Esc key
+        ch = waitKey(10);
+        if(ch == 27)
+            break;
+        
+        // Swap previous image with the current image
+        std::swap(prevGray, curGray);
+    }
+    
+    return 0;
+}
+
+
