@@ -23,7 +23,7 @@
     <ClCompile Include="pch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="FarnebackTracker.cpp">
+    <ClCompile Include="DISTracker.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -6,6 +6,8 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
 
+//#include <opencv2/optflow.hpp>
+
 #include <iostream>
 
 using namespace cv;
@@ -14,7 +16,8 @@ using namespace std;
 // Function to compute the optical flow map
 void drawOpticalFlow(const Mat& flowImage, Mat& flowImageGray)
 {
-    int stepSize = 16;
+    const int stepSize = 16;
+    //const int stepSize = 8;
     Scalar color = Scalar(0, 255, 0);
     
     // Draw the uniform grid of points on the input image along with the motion vectors
@@ -49,12 +52,13 @@ int main(int argc, char** argv)
         return -1;
     }
     
-    char ch;
     Mat curGray, prevGray, flowImage, flowImageGray, frame;
     string windowName = "Optical Flow";
     namedWindow(windowName, 1);
     float scalingFactor = 0.75;
     
+    auto optFlow = cv::DISOpticalFlow::create(DISOpticalFlow::PRESET_FAST);
+
     // Iterate until the user presses the Esc key
     while(true)
     {
@@ -71,7 +75,24 @@ int main(int argc, char** argv)
         cvtColor(frame, curGray, COLOR_BGR2GRAY);
         
         // Check if the image is valid
-        if(prevGray.data)
+        if (prevGray.data)
+#if 1
+        {
+            //cv::optflow::createOptFlow_DIS()
+            optFlow->calc(prevGray, curGray, flowImage);
+
+            // Convert to 3-channel RGB
+            cvtColor(prevGray, flowImageGray, COLOR_GRAY2BGR);
+
+            // Draw the optical flow map
+            drawOpticalFlow(flowImage, flowImageGray);
+
+            // Display the output image
+            imshow(windowName, flowImageGray);
+        }
+#endif
+
+#if 0
         {
             // Initialize parameters for the optical flow algorithm
             float pyrScale = 0.5;
@@ -82,7 +103,7 @@ int main(int argc, char** argv)
             float stdDeviation = 1.2;
             
             // Calculate optical flow map using Farneback algorithm
-            calcOpticalFlowFarneback(prevGray, curGray, flowImage, pyrScale, numLevels, windowSize, numIterations, neighborhoodSize, stdDeviation, OPTFLOW_USE_INITIAL_FLOW);
+            calcOpticalFlowFarneback(prevGray, curGray, flowImage, pyrScale, numLevels, windowSize, numIterations, neighborhoodSize, stdDeviation, 0);// OPTFLOW_USE_INITIAL_FLOW);
             
             // Convert to 3-channel RGB
             cvtColor(prevGray, flowImageGray, COLOR_GRAY2BGR);
@@ -93,9 +114,10 @@ int main(int argc, char** argv)
             // Display the output image
             imshow(windowName, flowImageGray);
         }
+#endif
         
         // Break out of the loop if the user presses the Esc key
-        ch = waitKey(10);
+        char ch = waitKey(30);
         if(ch == 27)
             break;
         
