@@ -85,7 +85,8 @@ static Vec3b computeColor(float fx, float fy)
         first = false;
     }
 
-    const float rad = sqrt(fx * fx + fy * fy);
+    //const float rad = hypot(fx, fy); //sqrt(fx * fx + fy * fy);
+    const float rad = std::max(std::abs(fx), std::abs(fy)); //sqrt(fx * fx + fy * fy);
     const float a = fastAtan2_(-fy, -fx) / (float)CV_PI;
 
     const float fk = (a + 1.0f) / 2.0f * (NCOLS - 1);
@@ -97,17 +98,17 @@ static Vec3b computeColor(float fx, float fy)
 
     for (int b = 0; b < 3; b++)
     {
-        const float col0 = colorWheel[k0][b] / 255.f;
-        const float col1 = colorWheel[k1][b] / 255.f;
+        const auto col0 = colorWheel[k0][b];// / 255.f;
+        const auto col1 = colorWheel[k1][b];// / 255.f;
 
         float col = (1 - f) * col0 + f * col1;
 
         if (rad <= 1)
-            col = 1 - rad * (1 - col); // increase saturation with radius
+            col = 255 - rad * (255 - col); // increase saturation with radius
         else
             col *= .75; // out of range
 
-        pix[2 - b] = static_cast<uchar>(255.f * col);
+        pix[2 - b] = static_cast<uchar>(/*255.f * */col);
     }
 
     return pix;
@@ -215,7 +216,7 @@ int main(int argc, char** argv)
     namedWindow(windowName, 1);
     float scalingFactor = 0.75;
     
-    auto optFlow = cv::DISOpticalFlow::create(DISOpticalFlow::PRESET_ULTRAFAST);
+    auto optFlow = cv::DISOpticalFlow::create(DISOpticalFlow::PRESET_FAST);
 
     // Iterate until the user presses the Esc key
     while(true)
