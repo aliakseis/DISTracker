@@ -6,7 +6,10 @@
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/highgui/highgui.hpp"
 
-//#include <opencv2/optflow.hpp>
+#include <opencv2/optflow.hpp>
+
+#include <opencv2/optflow/rlofflow.hpp>
+#include <opencv2/optflow/pcaflow.hpp>
 
 #include <iostream>
 
@@ -166,12 +169,17 @@ static void drawOpticalFlow(const Mat_<Point2f>& flow, Mat& dst, float maxmotion
     // determine motion range:
     float maxrad = maxmotion;
 
+    const auto xMin = flow.cols / 4;
+    const auto xMax = flow.cols * 3 / 4;
+    const auto yMin = flow.rows / 4;
+    const auto yMax = flow.rows * 3 / 4;
+
     if (maxmotion <= 0)
     {
-        maxrad = 1;
-        for (int y = 0; y < flow.rows; ++y)
+        maxrad = 1.e-20;
+        for (int y = yMin; y < yMax; ++y)
         {
-            for (int x = 0; x < flow.cols; ++x)
+            for (int x = xMin; x < xMax; ++x)
             {
                 Point2f u = flow(y, x);
 
@@ -183,14 +191,17 @@ static void drawOpticalFlow(const Mat_<Point2f>& flow, Mat& dst, float maxmotion
         }
     }
 
-    for (int y = 0; y < flow.rows; ++y)
+    for (int y = yMin; y < yMax; ++y)
     {
-        for (int x = 0; x < flow.cols; ++x)
+        for (int x = xMin; x < xMax; ++x)
         {
             Point2f u = flow(y, x);
 
-            if (isFlowCorrect(u))
-                dst.at<Vec3b>(y, x) = computeColor(u.x / maxrad, u.y / maxrad);
+            if (!isFlowCorrect(u))
+                continue;
+
+            //dst.at<Vec3b>(y, x) = computeColor(std::cbrt(u.x / maxrad), std::cbrt(u.y / maxrad));
+            dst.at<Vec3b>(y, x) = computeColor(u.x / maxrad, u.y / maxrad);
         }
     }
 }
@@ -214,9 +225,14 @@ int main(int argc, char** argv)
     Mat curGray, prevGray, flowImage, flowImageGray, frame;
     string windowName = "Optical Flow";
     namedWindow(windowName, 1);
-    float scalingFactor = 0.75;
+    float scalingFactor = .75;
     
-    auto optFlow = cv::DISOpticalFlow::create(DISOpticalFlow::PRESET_FAST);
+    //auto optFlow = cv::DISOpticalFlow::create(DISOpticalFlow::PRESET_ULTRAFAST);
+    //auto optFlow = cv::optflow::DenseRLOFOpticalFlow::create();
+    auto optFlow = std::make_unique<cv::optflow::OpticalFlowPCAFlow>();
+    //auto optFlow = cv::optflow::DualTVL1OpticalFlow::create();
+
+    const bool monochrome = false;
 
     // Iterate until the user presses the Esc key
     while(true)
@@ -228,10 +244,13 @@ int main(int argc, char** argv)
             break;
         
         // Resize the frame
-        //resize(frame, frame, Size(), scalingFactor, scalingFactor, INTER_AREA);
+        resize(frame, frame, Size(), scalingFactor, scalingFactor, INTER_AREA);
         
         // Convert to grayscale
-        cvtColor(frame, curGray, COLOR_BGR2GRAY);
+        if (monochrome)
+            cvtColor(frame, curGray, COLOR_BGR2GRAY);
+        else
+            curGray = frame;
         
         // Check if the image is valid
         if (prevGray.data)
@@ -241,7 +260,10 @@ int main(int argc, char** argv)
             optFlow->calc(prevGray, curGray, flowImage);
 
             // Convert to 3-channel RGB
-            cvtColor(prevGray, flowImageGray, COLOR_GRAY2BGR);
+            if (monochrome)
+                cvtColor(prevGray, flowImageGray, COLOR_GRAY2BGR);
+            else
+                flowImageGray = prevGray;
 
             // Draw the optical flow map
             drawOpticalFlow(flowImage, flowImageGray);
